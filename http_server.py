@@ -17,7 +17,12 @@ def response_ok(body=b"This is a minimal response", mimetype=b"text/plain"):
         <html><h1>Welcome:</h1></html>\r\n
         '''
     """
-    pass
+    resp = []
+    resp.append(b"HTTP/1.1 200 OK")
+    resp.append(b"Content-Type: " + mimetype)
+    resp.append(b'')
+    resp.append(b'' + body)
+    return b"\r\n".join(resp)
 
 
 def parse_request(request):
@@ -27,18 +32,45 @@ def parse_request(request):
     This server only handles GET requests, so this method shall raise a
     NotImplementedError if the method of the request is not GET.
     """
-    pass
+    first_line = request.split("\r\n", 1)[0]
+    method, uri, protocol = first_line.split()
+
+    if method != "GET":
+        raise NotImplementedError
+
+    return uri
 
 
 def response_method_not_allowed():
     """Returns a 405 Method Not Allowed response"""
-    pass
+
+    return b"\r\n".join([
+        b"HTTP/1.1 405 Method Not Allowed",
+        b"",
+        b"You can't do that on this server!"
+    ])
 
 
 def response_not_found():
     """Returns a 404 Not Found response"""
-    pass
+    resp = []
+    resp.append(b"HTTP/1.1 404 Error")
+    resp.append(b"Content-Type: text/html")
+    resp.append(b'')
+    resp.append(b"404 Not Found")
+    return b"\r\n".join(resp)
+
     
+def mime_type_define(uri):
+    mime = "text/plain"
+    value = uri.split(".")[-1]
+    if value == "txt": mime = "text/plain"
+    if value == "jpeg": mime = "image/jpeg"
+    if value == "png": mime = "image/png"
+    if value == "html": mime = "text/html"
+    if value == "py": mime = "text/html"
+    print("mime lookup:", mime)
+    return mime
 
 def resolve_uri(uri):
     """
@@ -68,16 +100,26 @@ def resolve_uri(uri):
 
     """
 
-    # TODO: Raise a NameError if the requested content is not present
-    # under webroot.
+    content = b"File not found"
+    mime_type = b"text/plain"
+
+    try:
+        mime_type = bytes(mime_type_define(uri), 'utf-8')
+        file = open("webroot/" + uri, "r")
+        file.seek(0)
+        body = file.read()
+        if (file != None):
+            file.close()
+            content = bytes(body, 'utf-8')
+        else:
+            raise NameError
+
+    finally:
+        return content, mime_type
 
     # TODO: Fill in the appropriate content and mime_type give the URI.
     # See the assignment guidelines for help on "mapping mime-types", though
     # you might need to create a special case for handling make_time.py
-    content = b"not implemented"
-    mime_type = b"not implemented"
-
-    return content, mime_type
 
 
 def server(log_buffer=sys.stderr):
@@ -93,13 +135,35 @@ def server(log_buffer=sys.stderr):
             print('waiting for a connection', file=log_buffer)
             conn, addr = sock.accept()  # blocking
             try:
-                print('connection - {0}:{1}'.format(*addr), file=log_buffer)
+                print('connection with - {0}:{1}'.format(*addr), file=log_buffer)
+
+                request = ""
                 while True:
-                    data = conn.recv(16)
-                    print('received "{0}"'.format(data), file=log_buffer)
-                    if data:
+                    data = conn.recv(1024)
+                    request += data.decode('utf-8')
+
+                    # hidden character on a PC PyCharm?
+                    if not data:
+                        break
+
+                    print('received first line "{0}"'.format(request), file=log_buffer)
+
+                    try:
+                        uri = parse_request(request)
+                    except NotImplementedError:
+                        response = response_method_not_allowed()
+                    else:
+                        try:
+                            content, mime_type = resolve_uri(uri)
+                        except NameError:
+                            response = response_not_found()
+                        else:
+                            response = response_ok(content, mime_type)
+
+                    if response:
                         print('sending data back to client', file=log_buffer)
-                        conn.sendall(data)
+                        print(response)
+                        conn.sendall(response)
                     else:
                         msg = 'no more data from {0}:{1}'.format(*addr)
                         print(msg, log_buffer)
