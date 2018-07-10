@@ -1,3 +1,20 @@
+#-------------------------------------------------#
+# Title: http_server.py
+# Dev:   Scott Luse
+# Date:  July 9, 2018
+#
+# Status:
+# 1. server successfully sends html and 404 errors
+# 1. server will only return one GET, the second GET
+# request will cause an error. This may be bug in server
+# line 167, watching for \r\n\r\n
+# 2. server throws an error for PNG files with:
+# Error: 'charmap' codec can't decode byte, line 133
+# 3. server sends text file properly but the web client
+# doesn't show the data:
+# b'HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nThis is a very...
+#-------------------------------------------------#
+
 import socket
 import sys
 
@@ -32,8 +49,8 @@ def parse_request(request):
     This server only handles GET requests, so this method shall raise a
     NotImplementedError if the method of the request is not GET.
     """
-    first_line = request.split("\r\n", 1)[0]
-    method, uri, protocol = first_line.split()
+    one_line = request.split("\r\n", 1)[0]
+    method, uri, protocol = one_line.split()
 
     if method != "GET":
         raise NotImplementedError
@@ -61,14 +78,13 @@ def response_not_found():
     return b"\r\n".join(resp)
 
     
-def mime_type_define(uri):
+def mime_type_define(ext_value):
     mime = "text/plain"
-    value = uri.split(".")[-1]
-    if value == "txt": mime = "text/plain"
-    if value == "jpeg": mime = "image/jpeg"
-    if value == "png": mime = "image/png"
-    if value == "html": mime = "text/html"
-    if value == "py": mime = "text/html"
+    if ext_value == "txt": mime = "text/plain"
+    if ext_value == "html": mime = "text/html"
+    if ext_value == "py": mime = "text/html"
+    if ext_value == "jpeg": mime = "image/jpeg"
+    if ext_value == "png": mime = "image/png"
     print("mime lookup:", mime)
     return mime
 
@@ -102,28 +118,38 @@ def resolve_uri(uri):
 
     content = b"File not found"
     mime_type = b"text/plain"
-
     try:
-        mime_type = bytes(mime_type_define(uri), 'utf-8')
-        file = open("webroot/" + uri, "r")
-        file.seek(0)
-        body = file.read()
-        if (file != None):
-            file.close()
-            content = bytes(body, 'utf-8')
-        else:
-            raise NameError
+        ext_value = uri.split(".")[-1]
+        mime_type = bytes(mime_type_define(ext_value), 'utf-8')
 
-    finally:
-        return content, mime_type
+        if ext_value == "txt" or "html" or "py":
+            file = open("webroot/" + uri, "r")
+            if (file != None):
+                file.seek(0)
+                body = file.read()
+                file.close()
+                content = bytes(body, 'utf-8')
+                return content, mime_type
 
-    # TODO: Fill in the appropriate content and mime_type give the URI.
-    # See the assignment guidelines for help on "mapping mime-types", though
-    # you might need to create a special case for handling make_time.py
+        # Error: 'charmap' codec can't decode byte 0x81 in position 178:
+        # character maps to <undefined>
+        if ext_value == "jpeg" or "png":
+            file = open("webroot/" + uri, "rb")
+            if (file != None):
+                file.seek(0)
+                body = file.read()
+                file.close()
+                content = body
+                return content, mime_type
+
+    except Exception as e:
+        print("Error: " + str(e))
+        raise NameError
+        # return content, mime_type
 
 
 def server(log_buffer=sys.stderr):
-    address = ('127.0.0.1', 10000)
+    address = ('127.0.0.1', 20000)
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     print("making a server on {0}:{1}".format(*address), file=log_buffer)
@@ -142,9 +168,9 @@ def server(log_buffer=sys.stderr):
                     data = conn.recv(1024)
                     request += data.decode('utf-8')
 
-                    # hidden character on a PC PyCharm?
-                    if not data:
-                        break
+                    # this does not work on PyCharm PC version
+                    # if '\r\n\r\n' in request:
+                    #     break
 
                     print('received first line "{0}"'.format(request), file=log_buffer)
 
