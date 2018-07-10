@@ -122,6 +122,8 @@ def resolve_uri(uri):
         ext_value = uri.split(".")[-1]
         mime_type = bytes(mime_type_define(ext_value), 'utf-8')
 
+        # do we really need to open the file?
+
         if ext_value == "txt" or "html" or "py":
             file = open("webroot/" + uri, "r")
             if (file != None):
@@ -145,11 +147,9 @@ def resolve_uri(uri):
     except Exception as e:
         print("Error: " + str(e))
         raise NameError
-        # return content, mime_type
-
 
 def server(log_buffer=sys.stderr):
-    address = ('127.0.0.1', 20000)
+    address = ('127.0.0.1', 10000)
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     print("making a server on {0}:{1}".format(*address), file=log_buffer)
