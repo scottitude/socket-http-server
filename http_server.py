@@ -1,18 +1,11 @@
 #-------------------------------------------------#
 # Title: http_server.py
 # Dev:   Scott Luse
-# Date:  July 9, 2018
+# Date:  July 10, 2018
 #
-# Status:
-# 1. server successfully sends html and 404 errors
-# 1. server will only return one GET, the second GET
-# request will cause an error. This may be bug in server
-# line 167, watching for \r\n\r\n
-# 2. server throws an error for PNG files with:
-# Error: 'charmap' codec can't decode byte, line 133
-# 3. server sends text file properly but the web client
-# doesn't show the data:
-# b'HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nThis is a very...
+# Status: indentation of server function while loop fixed!
+# 1. server successfully sends html, txt, py content and 404 errors
+# 2. server still has issues sending contents of image files
 #-------------------------------------------------#
 
 import socket
@@ -60,12 +53,12 @@ def parse_request(request):
 
 def response_method_not_allowed():
     """Returns a 405 Method Not Allowed response"""
-
-    return b"\r\n".join([
-        b"HTTP/1.1 405 Method Not Allowed",
-        b"",
-        b"You can't do that on this server!"
-    ])
+    resp = []
+    resp.append(b"HTTP/1.1 405 Method Not Allowed")
+    resp.append(b"Content-Type: text/html")
+    resp.append(b'')
+    resp.append(b"405 You can't do that on this server!")
+    return b"\r\n".join(resp)
 
 
 def response_not_found():
@@ -165,35 +158,34 @@ def server(log_buffer=sys.stderr):
 
                 request = ""
                 while True:
-                    data = conn.recv(1024)
+                    data = conn.recv(16)
                     request += data.decode('utf-8')
 
-                    # this does not work on PyCharm PC version
-                    # if '\r\n\r\n' in request:
-                    #     break
-
-                    print('received first line "{0}"'.format(request), file=log_buffer)
-
-                    try:
-                        uri = parse_request(request)
-                    except NotImplementedError:
-                        response = response_method_not_allowed()
-                    else:
-                        try:
-                            content, mime_type = resolve_uri(uri)
-                        except NameError:
-                            response = response_not_found()
-                        else:
-                            response = response_ok(content, mime_type)
-
-                    if response:
-                        print('sending data back to client', file=log_buffer)
-                        print(response)
-                        conn.sendall(response)
-                    else:
-                        msg = 'no more data from {0}:{1}'.format(*addr)
-                        print(msg, log_buffer)
+                    if '\r\n\r\n' in request:
                         break
+
+                print('received first line "{0}"'.format(request), file=log_buffer)
+
+                try:
+                    uri = parse_request(request)
+                except NotImplementedError:
+                    response = response_method_not_allowed()
+                else:
+                    try:
+                        content, mime_type = resolve_uri(uri)
+                    except NameError:
+                        response = response_not_found()
+                    else:
+                        response = response_ok(content, mime_type)
+
+                if response:
+                    print('sending data back to client', file=log_buffer)
+                    print(response)
+                    conn.sendall(response)
+                else:
+                    msg = 'no more data from {0}:{1}'.format(*addr)
+                    print(msg, log_buffer)
+                    break
             finally:
                 conn.close()
 
