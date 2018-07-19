@@ -1,10 +1,13 @@
 #-------------------------------------------------#
 # Title: http_server.py
 # Dev:   Scott Luse
-# Date:  July 10, 2018
+# Date:  July 18, 2018
 #
-# Status: indentation of server function while loop fixed!
-# 1. server successfully sends html, txt, py content and 404 errors
+# Status Commit #3: Successfully sends all mime types
+# 1. Sometimes the server hangs after 2-3 responses
+#
+# Status Commit #2: indentation of server function while loop fixed!
+# 1. server successfully sends html, txt, py content and 4mime lookup04 errors
 # 2. server still has issues sending contents of image files
 #-------------------------------------------------#
 
@@ -76,9 +79,8 @@ def mime_type_define(ext_value):
     if ext_value == "txt": mime = "text/plain"
     if ext_value == "html": mime = "text/html"
     if ext_value == "py": mime = "text/html"
-    if ext_value == "jpeg": mime = "image/jpeg"
+    if ext_value == "jpg": mime = "image/jpg"
     if ext_value == "png": mime = "image/png"
-    print("mime lookup:", mime)
     return mime
 
 def resolve_uri(uri):
@@ -114,10 +116,15 @@ def resolve_uri(uri):
     try:
         ext_value = uri.split(".")[-1]
         mime_type = bytes(mime_type_define(ext_value), 'utf-8')
-
-        # do we really need to open the file?
-
-        if ext_value == "txt" or "html" or "py":
+        if (ext_value == "jpg") or (ext_value == "png"):
+            file = open("webroot/" + uri, "rb")
+            if (file != None):
+                file.seek(0)
+                body = file.read()
+                file.close()
+                content = body
+                return content, mime_type
+        else:
             file = open("webroot/" + uri, "r")
             if (file != None):
                 file.seek(0)
@@ -126,19 +133,9 @@ def resolve_uri(uri):
                 content = bytes(body, 'utf-8')
                 return content, mime_type
 
-        # Error: 'charmap' codec can't decode byte 0x81 in position 178:
-        # character maps to <undefined>
-        if ext_value == "jpeg" or "png":
-            file = open("webroot/" + uri, "rb")
-            if (file != None):
-                file.seek(0)
-                body = file.read()
-                file.close()
-                content = body
-                return content, mime_type
 
     except Exception as e:
-        print("Error: " + str(e))
+        print("Error100: " + str(e))
         raise NameError
 
 def server(log_buffer=sys.stderr):
